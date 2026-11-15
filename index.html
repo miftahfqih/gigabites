@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Gigabites — Homemade Cheesecuits</title>
+  <meta name="description" content="Pesan cheesecuit Gigabites: Chocolate Bar, Double Cheese, Lushberry, dan Orange Sunshine. Ambil di TULT atau diantar." />
+  <meta name="theme-color" content="#FFC629" />
+  <link rel="icon" href="assets/favicon.png" />
+  <meta property="og:title" content="Gigabites — Homemade Cheesecuits" />
+  <meta property="og:description" content="Sweet bites, creamy vibes. Pre-order cheesecuit & Orange Sunshine." />
+  <meta property="og:image" content="assets/menu/chocolate-bar.webp" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <a class="skip" href="#menu">Langsung ke menu</a>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Gigabites, ke atas">
+      <img src="assets/logo.png" alt="" width="40" height="40" />
+      <span>Gigabites</span>
+    </a>
+    <nav class="topnav">
+      <button class="btn-ghost" id="btnTrack" type="button">Cek pesanan</button>
+      <button class="cart-btn" id="btnCart" type="button" aria-label="Buka keranjang">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1.2 11.1a2 2 0 0 1-2 1.9H9.2a2 2 0 0 1-2-1.9L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+        <span class="cart-count" id="cartCount" hidden>0</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-sun" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <h1>Cheesecuit lapis demi lapis, dibuat fresh tiap hari.</h1>
+          <p class="lead">Pilih rasa dan ukuran, tentukan tanggal, lalu ambil di kampus atau kami antar.</p>
+          <div class="hero-actions">
+            <a class="btn btn-cocoa" href="#menu">Pilih menu</a>
+            <a class="btn btn-line" href="#cara">Cara pesan</a>
+          </div>
+          <div class="dates-strip" id="datesStrip" aria-live="polite">
+            <span class="dates-label">Jadwal pre-order</span>
+            <div class="dates-list" id="datesList"><span class="skeleton-chip"></span><span class="skeleton-chip"></span></div>
+          </div>
+        </div>
+
+        <div class="hero-art" aria-hidden="true">
+          <img class="mascot" src="assets/mascot.svg" alt="" />
+          <div class="cup">
+            <div class="layer l-top"></div>
+            <div class="layer l-cream"></div>
+            <div class="layer l-biscuit"></div>
+            <div class="layer l-cream"></div>
+            <div class="layer l-biscuit"></div>
+            <div class="layer l-cream"></div>
+            <div class="layer l-biscuit"></div>
+            <img class="cup-label" src="assets/logo.png" alt="" />
+          </div>
+          <div class="cup-shadow"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="notice" id="notice" hidden></div>
+
+    <section class="menu" id="menu" aria-labelledby="menuTitle">
+      <div class="section-head">
+        <h2 id="menuTitle">Cheesecuit</h2>
+        <p>Megabites 120 ml untuk sendiri, Gigabites 150 ml kalau lagi lapar banget.</p>
+      </div>
+      <div class="bands" id="cheesecuitList">
+        <div class="band skeleton"></div><div class="band skeleton"></div>
+      </div>
+
+      <div id="bundleSection" hidden>
+        <div class="section-head drink-head">
+          <h2>Special Bundles</h2>
+          <p>Cheesecuit plus Orange Sunshine dalam satu paket, rasa cheesecuit bebas kamu pilih.</p>
+        </div>
+        <div class="bands" id="bundleList"></div>
+      </div>
+
+      <div class="section-head drink-head">
+        <h2>Giga Drink</h2>
+        <p>Teman segar cheesecuit: Mega Drink 14 oz atau Giga Drink 16 oz.</p>
+      </div>
+      <div class="bands" id="drinkList"></div>
+    </section>
+
+    <section class="how" id="cara" aria-labelledby="howTitle">
+      <h2 id="howTitle">Cara pesan</h2>
+      <ol class="steps">
+        <li><strong>Pilih menu</strong><span>Tentukan rasa dan ukuran, tambahkan catatan kalau perlu.</span></li>
+        <li><strong>Pilih tanggal</strong><span>Ambil di TULT / kontrakan Pak Bagoes, atau minta diantar.</span></li>
+        <li><strong>Bayar QRIS</strong><span>Scan pakai GoPay atau e-wallet lain, lalu upload bukti bayar.</span></li>
+        <li><strong>Simpan kode</strong><span>Pakai kode pesanan untuk cek status kapan saja.</span></li>
+      </ol>
+      <div class="pickup-info" id="pickupInfo"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img class="footer-art" src="assets/footer.webp" alt="Gigabites — sweet bites, creamy vibes" width="120" height="120" loading="lazy" />
+    <div>
+      <strong>Gigabites</strong>
+      <p>Sweet bites, creamy vibes. <a id="igLink" href="https://instagram.com/gigabites_official" target="_blank" rel="noopener">@gigabites_official</a></p>
+    </div>
+  </footer>
+
+  <!-- Bar keranjang mengambang -->
+  <button class="cartbar" id="cartbar" type="button" hidden>
+    <span class="cartbar-count" id="cartbarCount">0 item</span>
+    <span class="cartbar-total" id="cartbarTotal">Rp0</span>
+    <span class="cartbar-cta">Lihat keranjang</span>
+  </button>
+
+  <!-- Sheet pilih varian -->
+  <div class="overlay" id="overlay" hidden></div>
+  <section class="sheet" id="productSheet" role="dialog" aria-modal="true" aria-labelledby="psName" hidden>
+    <button class="sheet-close" type="button" data-close aria-label="Tutup">&times;</button>
+    <div class="ps-media"><img id="psImg" alt="" /></div>
+    <div class="ps-body">
+      <p class="ps-tag" id="psTag"></p>
+      <h3 id="psName"></h3>
+      <p class="ps-desc" id="psDesc"></p>
+      <p class="save-note" id="psSave" hidden></p>
+      <div id="psSlots" class="slots" hidden></div>
+      <fieldset class="variant-pick" id="psVariantPick">
+        <legend>Ukuran</legend>
+        <div id="psVariants" class="variant-options"></div>
+      </fieldset>
+      <div class="ps-row">
+        <span class="field-label">Jumlah</span>
+        <div class="qty" id="psQty">
+          <button type="button" data-q="-1" aria-label="Kurangi">−</button>
+          <output id="psQtyVal">1</output>
+          <button type="button" data-q="1" aria-label="Tambah">+</button>
+        </div>
+      </div>
+      <label class="field">
+        <span class="field-label">Catatan untuk item ini <em>(opsional)</em></span>
+        <input id="psNote" maxlength="200" placeholder="Contoh: tolong pisahkan sendoknya" />
+      </label>
+      <button class="btn btn-cocoa btn-block" id="psAdd" type="button">Tambah ke keranjang</button>
+    </div>
+  </section>
+
+  <!-- Drawer keranjang -->
+  <aside class="drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="cartTitle" hidden>
+    <div class="drawer-head">
+      <h3 id="cartTitle">Keranjang</h3>
+      <button class="sheet-close" type="button" data-close aria-label="Tutup">&times;</button>
+    </div>
+    <div class="drawer-body" id="cartItems"></div>
+    <div class="drawer-foot" id="cartFoot">
+      <div class="sum-row"><span>Subtotal</span><strong id="cartSubtotal">Rp0</strong></div>
+      <button class="btn btn-cocoa btn-block" id="btnCheckout" type="button">Lanjut isi data</button>
+    </div>
+  </aside>
+
+  <!-- Checkout -->
+  <section class="checkout" id="checkout" role="dialog" aria-modal="true" aria-labelledby="coTitle" hidden>
+    <div class="co-top">
+      <button class="co-back" id="coBack" type="button" aria-label="Kembali">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h3 id="coTitle">Checkout</h3>
+      <button class="sheet-close" type="button" data-close aria-label="Tutup">&times;</button>
+    </div>
+    <ol class="stepper" id="stepper">
+      <li data-step="1"><span>1</span>Data diri</li>
+      <li data-step="2"><span>2</span>Pengambilan</li>
+      <li data-step="3"><span>3</span>Pembayaran</li>
+    </ol>
+
+    <form class="co-body" id="coForm" novalidate>
+      <!-- STEP 1 -->
+      <div class="co-step" data-step="1">
+        <h4>Siapa yang pesan?</h4>
+        <p class="hint">Tanpa daftar akun. Nomor WhatsApp dipakai untuk konfirmasi pesanan.</p>
+        <label class="field">
+          <span class="field-label">Nama</span>
+          <input name="name" id="fName" autocomplete="name" maxlength="80" placeholder="Nama kamu" required />
+          <span class="field-err" data-for="name"></span>
+        </label>
+        <label class="field">
+          <span class="field-label">Nomor WhatsApp</span>
+          <input name="phone" id="fPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="08xxxxxxxxxx" required />
+          <span class="field-err" data-for="phone"></span>
+        </label>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="co-step" data-step="2" hidden>
+        <h4>Kapan dan bagaimana pesanannya sampai?</h4>
+        <div class="field">
+          <span class="field-label">Tanggal</span>
+          <div class="date-options" id="dateOptions"></div>
+          <span class="field-err" data-for="sale_date"></span>
+        </div>
+        <div class="field">
+          <span class="field-label">Cara terima</span>
+          <div class="method-toggle" role="radiogroup">
+            <label class="method"><input type="radio" name="method" value="pickup" checked />
+              <span><strong>Ambil sendiri</strong><small>Gratis</small></span></label>
+            <label class="method"><input type="radio" name="method" value="delivery" />
+              <span><strong>Diantar</strong><small>Gratis</small></span></label>
+          </div>
+        </div>
+        <div class="field" id="pickupBox">
+          <span class="field-label">Lokasi pengambilan</span>
+          <div class="loc-options" id="locOptions"></div>
+          <span class="field-err" data-for="pickup_location"></span>
+        </div>
+        <div class="field" id="deliveryBox" hidden>
+          <label class="field">
+            <span class="field-label">Alamat lengkap</span>
+            <textarea name="address" id="fAddress" rows="3" maxlength="400" placeholder="Nama kos/kontrakan, nomor kamar, patokan"></textarea>
+          </label>
+          <p class="hint" id="deliveryNote"></p>
+          <span class="field-err" data-for="address"></span>
+        </div>
+        <label class="field">
+          <span class="field-label">Catatan pesanan <em>(opsional)</em></span>
+          <textarea name="notes" id="fNotes" rows="2" maxlength="500" placeholder="Contoh: antar setelah jam 4 sore, titip ke satpam"></textarea>
+        </label>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="co-step" data-step="3" hidden>
+        <div class="summary" id="summary"></div>
+        <label class="field">
+          <span class="field-label">Kode referal <em>(opsional, 3 huruf)</em></span>
+          <input name="referral" id="fReferral" maxlength="3" autocomplete="off" autocapitalize="characters" placeholder="ABC" class="ref-input" />
+          <span class="field-err" data-for="referral"></span>
+        </label>
+        <div class="pay">
+          <div class="pay-qr">
+            <img id="qrisImg" src="assets/qris-placeholder.svg" alt="Kode QRIS Gigabites" />
+            <a class="btn-ghost small" id="qrisDownload" download="QRIS-Gigabites.jpg" href="#">Simpan gambar QRIS</a>
+          </div>
+          <div class="pay-steps">
+            <p class="pay-amount">Bayar tepat <strong id="payTotal">Rp0</strong>
+              <button class="btn-ghost small" id="copyTotal" type="button">Salin nominal</button></p>
+            <ol>
+              <li>Buka GoPay atau e-wallet/m-banking apa pun yang mendukung QRIS.</li>
+              <li>Scan QR di samping (atau simpan gambarnya lalu upload dari galeri).</li>
+              <li>Masukkan nominal di atas, selesaikan pembayaran, lalu screenshot buktinya.</li>
+            </ol>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">Bukti pembayaran</span>
+          <label class="upload" id="uploadBox">
+            <input type="file" id="fProof" accept="image/*" />
+            <span class="upload-empty" id="uploadEmpty">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              <strong>Pilih screenshot bukti bayar</strong>
+              <small>JPG atau PNG, otomatis dikompres</small>
+            </span>
+            <img id="proofPreview" alt="Pratinjau bukti pembayaran" hidden />
+          </label>
+          <span class="field-err" data-for="proof"></span>
+        </div>
+      </div>
+
+      <!-- SUKSES -->
+      <div class="co-step co-success" data-step="done" hidden>
+        <img src="assets/mascot.svg" alt="" class="success-mascot" />
+        <h4>Pesanan terkirim!</h4>
+        <p>Admin akan mengecek bukti bayarmu. Simpan kode ini untuk cek status pesanan.</p>
+        <div class="order-code">
+          <span id="doneCode">GB0000-XXXX</span>
+          <button class="btn-ghost small" id="copyCode" type="button">Salin kode</button>
+        </div>
+        <div class="done-summary" id="doneSummary"></div>
+        <a class="btn btn-wa btn-block" id="doneWa" href="#" target="_blank" rel="noopener" hidden>Konfirmasi lewat WhatsApp</a>
+        <button class="btn btn-line btn-block" id="doneAgain" type="button">Kembali ke menu</button>
+      </div>
+    </form>
+
+    <div class="co-foot" id="coFoot">
+      <div class="co-total"><span>Total</span><strong id="coTotal">Rp0</strong></div>
+      <button class="btn btn-cocoa" id="coNext" type="button">Lanjut</button>
+    </div>
+  </section>
+
+  <!-- Cek pesanan -->
+  <section class="sheet sheet-small" id="trackSheet" role="dialog" aria-modal="true" aria-labelledby="trackTitle" hidden>
+    <button class="sheet-close" type="button" data-close aria-label="Tutup">&times;</button>
+    <div class="ps-body">
+      <h3 id="trackTitle">Cek status pesanan</h3>
+      <form id="trackForm" class="track-form">
+        <label class="field"><span class="field-label">Kode pesanan</span>
+          <input id="tCode" placeholder="GB1511-AB12" autocapitalize="characters" required /></label>
+        <label class="field"><span class="field-label">Nomor WhatsApp</span>
+          <input id="tPhone" type="tel" inputmode="tel" placeholder="08xxxxxxxxxx" required /></label>
+        <button class="btn btn-cocoa btn-block" type="submit">Cek status</button>
+      </form>
+      <div id="trackResult" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

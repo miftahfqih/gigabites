@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-label="Maskot capybara Gigabites">
+  <!-- jeruk di atas kepala -->
+  <circle cx="110" cy="40" r="22" fill="#FFA41B"/>
+  <circle cx="103" cy="33" r="5" fill="#FFC86B" opacity=".8"/>
+  <path d="M110 18c4-9 14-11 20-8-3 7-11 11-20 8z" fill="#5F9E3A"/>
+  <path d="M110 19v-6" stroke="#6B4423" stroke-width="3" stroke-linecap="round"/>
+  <!-- telinga -->
+  <ellipse cx="58" cy="70" rx="15" ry="12" fill="#7A4A28"/>
+  <ellipse cx="162" cy="70" rx="15" ry="12" fill="#7A4A28"/>
+  <ellipse cx="58" cy="71" rx="7" ry="5" fill="#5A3519"/>
+  <ellipse cx="162" cy="71" rx="7" ry="5" fill="#5A3519"/>
+  <!-- kepala -->
+  <rect x="34" y="60" width="152" height="140" rx="66" fill="#A86B3C"/>
+  <path d="M60 80c20-12 80-12 100 0" stroke="#94592F" stroke-width="4" fill="none" stroke-linecap="round" opacity=".6"/>
+  <!-- moncong -->
+  <ellipse cx="110" cy="156" rx="58" ry="38" fill="#C48A5A"/>
+  <ellipse cx="96" cy="146" rx="6" ry="4.5" fill="#4A2C1A"/>
+  <ellipse cx="124" cy="146" rx="6" ry="4.5" fill="#4A2C1A"/>
+  <path d="M100 166q10 8 20 0" stroke="#4A2C1A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <!-- mata -->
+  <circle cx="76" cy="114" r="8" fill="#2E1A0E"/>
+  <circle cx="144" cy="114" r="8" fill="#2E1A0E"/>
+  <circle cx="79" cy="111" r="2.6" fill="#fff"/>
+  <circle cx="147" cy="111" r="2.6" fill="#fff"/>
+  <!-- pipi -->
+  <ellipse cx="58" cy="140" rx="11" ry="7" fill="#F08A8A" opacity=".55"/>
+  <ellipse cx="162" cy="140" rx="11" ry="7" fill="#F08A8A" opacity=".55"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-label="QRIS belum diunggah">
+  <rect width="300" height="300" rx="20" fill="#FFF8EA" stroke="#C8955F" stroke-width="3" stroke-dasharray="10 8"/>
+  <g fill="#C8955F" opacity=".55">
+    <rect x="50" y="50" width="60" height="60" rx="6"/><rect x="190" y="50" width="60" height="60" rx="6"/>
+    <rect x="50" y="190" width="60" height="60" rx="6"/><rect x="130" y="130" width="40" height="40" rx="4"/>
+    <rect x="190" y="190" width="24" height="24" rx="3"/><rect x="226" y="226" width="24" height="24" rx="3"/>
+  </g>
+  <text x="150" y="285" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#8A5A3B">Upload foto QRIS di dashboard admin</text>
+</svg>
