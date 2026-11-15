@@ -12,7 +12,7 @@
  * Login admin demo: email apa saja + password  demo123
  */
 window.GIGABITES_CONFIG = {
-  SUPABASE_URL: 'https:dcmickjzlhmlnfsfggmd.supabase.co',
+  SUPABASE_URL: 'https://dcmickjzlhmlnfsfggmd.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_zr21OZYgH_RusvFtOlj6eg_28eLIn5c',
   INSTAGRAM: 'gigabites_official',
 };
