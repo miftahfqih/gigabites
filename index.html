@@ -44,7 +44,7 @@
             <a class="btn btn-line" href="#cara">Cara pesan</a>
           </div>
           <div class="dates-strip" id="datesStrip" aria-live="polite">
-            <span class="dates-label">Jadwal pre-order</span>
+            <span class="dates-label">Periode PO</span>
             <div class="dates-list" id="datesList"><span class="skeleton-chip"></span><span class="skeleton-chip"></span></div>
           </div>
         </div>
@@ -96,8 +96,8 @@
       <h2 id="howTitle">Cara pesan</h2>
       <ol class="steps">
         <li><strong>Pilih menu</strong><span>Tentukan rasa dan ukuran, tambahkan catatan kalau perlu.</span></li>
-        <li><strong>Pilih tanggal</strong><span>Ambil di TULT / kontrakan Pak Bagoes, atau minta diantar.</span></li>
-        <li><strong>Bayar QRIS</strong><span>Scan pakai GoPay atau e-wallet lain, lalu upload bukti bayar.</span></li>
+        <li><strong>Pilih tanggal</strong><span>Pilih tanggal dalam periode PO, lalu ambil di TULT / kontrakan Pak Bagoes atau diantar gratis.</span></li>
+        <li><strong>Bayar QRIS</strong><span>Scan pakai e-wallet atau m-banking apa pun, lalu upload bukti bayar.</span></li>
         <li><strong>Simpan kode</strong><span>Pakai kode pesanan untuk cek status kapan saja.</span></li>
       </ol>
       <div class="pickup-info" id="pickupInfo"></div>
@@ -134,6 +134,7 @@
         <legend>Ukuran</legend>
         <div id="psVariants" class="variant-options"></div>
       </fieldset>
+      <p class="stock-note" id="psStock" hidden></p>
       <div class="ps-row">
         <span class="field-label">Jumlah</span>
         <div class="qty" id="psQty">
@@ -199,7 +200,8 @@
       <div class="co-step" data-step="2" hidden>
         <h4>Kapan dan bagaimana pesanannya sampai?</h4>
         <div class="field">
-          <span class="field-label">Tanggal</span>
+          <span class="field-label">Tanggal ambil / antar</span>
+          <p class="hint" id="periodHint"></p>
           <div class="date-options" id="dateOptions"></div>
           <span class="field-err" data-for="sale_date"></span>
         </div>
@@ -248,7 +250,7 @@
             <p class="pay-amount">Bayar tepat <strong id="payTotal">Rp0</strong>
               <button class="btn-ghost small" id="copyTotal" type="button">Salin nominal</button></p>
             <ol>
-              <li>Buka GoPay atau e-wallet/m-banking apa pun yang mendukung QRIS.</li>
+              <li>Buka e-wallet atau m-banking apa pun yang mendukung QRIS.</li>
               <li>Scan QR di samping (atau simpan gambarnya lalu upload dari galeri).</li>
               <li>Masukkan nominal di atas, selesaikan pembayaran, lalu screenshot buktinya.</li>
             </ol>
