@@ -496,7 +496,7 @@
     if (!f) return;
     try {
       U.toast('Mengunggah foto…');
-      const blob = await U.compressImage(f, 1200, 0.85);
+      const blob = await U.compressImage(f, 1200, 0.88, { keepAlpha: true });
       S.editing.image_url = await API.uploadAsset(blob, 'menu');
       $('#peImg').src = S.editing.image_url;
     } catch (err) { U.toast(U.errMsg(err), 'error'); }
@@ -779,6 +779,7 @@
     try {
       U.toast('Mengunggah QRIS…');
       // QRIS jangan dikompres terlalu kecil agar tetap bisa discan
+      // QRIS tetap JPG berlatar putih (paling aman untuk discan)
       const blob = await U.compressImage(f, 1400, 0.92);
       S.settings.qris_image_url = await API.uploadAsset(blob, 'qris');
       $('#sQrisPrev').src = S.settings.qris_image_url;
