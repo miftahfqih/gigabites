@@ -44,7 +44,7 @@
         <button role="tab" data-tab="menu">
           <svg viewBox="0 0 24 24"><path d="M5 9h14l-1.4 10.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8z"/><path d="M5 9c0-3 3-5 7-5s7 2 7 5"/></svg><span>Menu</span></button>
         <button role="tab" data-tab="dates">
-          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Jadwal</span></button>
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>PO & Stok</span></button>
         <button role="tab" data-tab="settings">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Pengaturan</span></button>
       </nav>
@@ -69,7 +69,7 @@
           </div>
         </header>
         <div class="filters">
-          <label class="f"><span>Tanggal</span><select id="fDate"></select></label>
+          <label class="f f-period"><span>Periode PO</span><select id="fPeriod"></select></label>
           <label class="f"><span>Cara terima</span>
             <select id="fMethod"><option value="">Semua</option><option value="pickup">Ambil sendiri</option><option value="delivery">Diantar</option></select></label>
           <label class="f f-grow"><span>Cari</span><input id="fSearch" placeholder="Nama, no. WA, kode, referal" /></label>
@@ -84,6 +84,7 @@
         <header class="panel-head">
           <h1>Rekap penjualan</h1>
           <div class="filters inline">
+            <label class="f f-period"><span>Periode PO</span><select id="rPeriod"></select></label>
             <label class="f"><span>Dari</span><input type="date" id="rFrom" /></label>
             <label class="f"><span>Sampai</span><input type="date" id="rTo" /></label>
           </div>
@@ -108,16 +109,51 @@
         <div class="menu-admin" id="menuAdmin"></div>
       </section>
 
-      <!-- JADWAL -->
+      <!-- PO & STOK -->
       <section class="panel" data-panel="dates" hidden>
-        <header class="panel-head"><h1>Jadwal penjualan</h1></header>
-        <form class="add-date box" id="addDateForm">
-          <label class="f"><span>Tanggal</span><input type="date" id="dDate" required /></label>
-          <label class="f"><span>Kuota pesanan <em>(opsional)</em></span><input type="number" id="dMax" min="1" placeholder="Tanpa batas" /></label>
-          <label class="f f-grow"><span>Catatan untuk pembeli <em>(opsional)</em></span><input id="dNote" maxlength="80" placeholder="Contoh: Spesial Lushberry" /></label>
-          <button class="btn btn-cocoa" type="submit">Tambah tanggal</button>
+        <header class="panel-head"><h1>Periode PO & stok</h1></header>
+        <p class="hint">Pembeli hanya bisa memesan saat periode sedang berjalan (antara tanggal PO dibuka dan ditutup), lalu memilih tanggal ambil/antar di dalam rentangnya.
+          Stok dihitung per varian per periode dan ikut berkurang saat varian itu dibeli di dalam paket.</p>
+
+        <form class="box po-form" id="periodForm">
+          <h2 id="pFormTitle">Periode PO baru</h2>
+          <input type="hidden" id="pId" />
+          <div class="po-form-grid">
+            <label class="f po-name"><span>Nama periode</span><input id="pName" maxlength="60" placeholder="Contoh: PO Minggu 3" required /></label>
+            <fieldset class="po-range">
+              <legend>PO dibuka (pembeli bisa memesan)</legend>
+              <label class="f"><span>Mulai</span><input type="date" id="pOrderStart" required /></label>
+              <label class="f"><span>Sampai</span><input type="date" id="pOrderEnd" required /></label>
+            </fieldset>
+            <fieldset class="po-range">
+              <legend>Tanggal ambil / antar</legend>
+              <label class="f"><span>Mulai</span><input type="date" id="pDelStart" required /></label>
+              <label class="f"><span>Sampai</span><input type="date" id="pDelEnd" required /></label>
+            </fieldset>
+            <label class="f po-note"><span>Catatan untuk pembeli <em>(opsional)</em></span><input id="pNote" maxlength="120" placeholder="Contoh: Ambil mulai jam 13.00" /></label>
+          </div>
+          <label class="switch-row" id="pCopyRow"><input type="checkbox" class="switch" id="pCopy" checked /><span>Salin kuota stok dari periode terakhir</span></label>
+          <div class="po-form-actions">
+            <button type="button" class="btn-ghost small" id="pCancel" hidden>Batal edit</button>
+            <button class="btn btn-cocoa" type="submit" id="pSave">Buat periode</button>
+          </div>
         </form>
-        <div class="date-admin" id="dateAdmin"></div>
+
+        <div class="po-list" id="periodList"></div>
+
+        <section class="box stock-panel" id="stockPanel" hidden>
+          <div class="stock-head">
+            <h2 id="stockTitle">Stok</h2>
+            <button type="button" class="btn-ghost small" id="btnCloseStock">Tutup</button>
+          </div>
+          <p class="hint">Isi kuota tiap varian untuk periode ini. Kosongkan (∞) kalau tidak dibatasi. "Terjual" sudah termasuk isi paket bundle; pesanan yang dibatalkan tidak dihitung.</p>
+          <div class="stock-fill">
+            <label class="f"><span>Isi semua kuota dengan</span><input type="number" min="0" id="stockFillAll" placeholder="25" /></label>
+            <button type="button" class="btn-chip" id="btnFillAll">Terapkan</button>
+          </div>
+          <div id="stockTable"></div>
+          <div class="save-bar"><button type="button" class="btn btn-cocoa" id="btnSaveStock">Simpan stok</button></div>
+        </section>
       </section>
 
       <!-- PENGATURAN -->
@@ -133,11 +169,11 @@
               <input id="sWa" type="tel" placeholder="08xxxxxxxxxx" /></label>
           </div>
           <div class="box">
-            <h2>QRIS GoPay</h2>
+            <h2>QRIS</h2>
             <div class="qris-edit">
               <img id="sQrisPrev" src="assets/qris-placeholder.svg" alt="QRIS saat ini" />
               <div>
-                <p class="hint">Upload foto/screenshot QRIS GoPay Merchant kamu. Gambar ini yang discan pembeli.</p>
+                <p class="hint">Upload foto/screenshot QRIS toko kamu. Gambar ini yang discan pembeli.</p>
                 <label class="btn btn-line file-btn">Pilih gambar QRIS<input type="file" id="sQrisFile" accept="image/*" /></label>
               </div>
             </div>
