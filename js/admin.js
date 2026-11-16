@@ -13,9 +13,12 @@
   const S = {
     orders: [],
     products: [],
-    saleDates: [],
+    periods: [],
+    stockPeriod: null,     // periode yang sedang diatur stoknya
+    stockQuota: {},
+    stockSold: {},
     settings: null,
-    filter: { date: 'upcoming', method: '', status: 'all', q: '' },
+    filter: { period: null, method: '', status: 'all', q: '' },
     current: null,         // pesanan yang sedang dibuka
     editing: null,         // produk yang sedang diedit
     deletedVariants: [],
@@ -66,7 +69,8 @@
     $('#appView').hidden = false;
     $('#whoami').textContent = me ? me.email : '';
     initRecapRange();
-    await Promise.all([loadOrders(), loadDates(), loadProducts(), loadSettings()]);
+    await Promise.all([loadOrders(true), loadProducts(), loadSettings()]);
+    await loadPeriods();
     API.onNewOrder((o) => {
       U.toast(`Pesanan baru dari ${o.customer_name} — ${rupiah(o.total)}`, 'success', 6000);
       S.newIds.add(o.id);
@@ -83,36 +87,43 @@
     $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
     $$('.panel').forEach((p) => (p.hidden = p.dataset.panel !== t));
     if (t === 'recap') loadRecap();
-    if (t === 'dates') renderDates();
+    if (t === 'dates') renderPeriods();
     window.scrollTo(0, 0);
   }
 
   /* ================= PESANAN ================= */
   async function loadOrders(silent) {
     try {
-      S.orders = await API.listOrders({ from: addDays(today(), -90) });
-      renderDateFilter();
+      S.orders = await API.listOrders({ from: addDays(today(), -120) });
       renderOrders();
+      if (S.tab === 'dates') renderPeriods();
     } catch (e) { if (!silent) U.toast(U.errMsg(e), 'error'); }
   }
 
-  function renderDateFilter() {
-    const sel = $('#fDate');
-    const dates = new Set([...S.orders.map((o) => o.sale_date), ...S.saleDates.map((d) => d.sale_date)]);
-    const sorted = [...dates].sort().reverse();
-    const cur = S.filter.date;
-    sel.innerHTML = `<option value="upcoming">Hari ini & mendatang</option><option value="">Semua (90 hari)</option>` +
-      sorted.map((d) => `<option value="${d}">${esc(U.fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))}</option>`).join('');
-    sel.value = [...sel.options].some((o) => o.value === cur) ? cur : 'upcoming';
+  // isi pilihan periode di tab Pesanan & Rekap
+  function renderPeriodFilters() {
+    const opts = S.periods.map((p) => `<option value="${p.id}">${esc(p.name)} (${esc(rangeTxt(p.order_start, p.order_end))})</option>`).join('');
+    if (S.filter.period === null) {
+      const live = S.periods.find((p) => periodStatus(p)[1] === 'live');
+      S.filter.period = live ? live.id : '';
+    }
+    const f = $('#fPeriod');
+    f.innerHTML = `<option value="">Semua periode (120 hari)</option>${opts}`;
+    f.value = [...f.options].some((o) => o.value === S.filter.period) ? S.filter.period : '';
+    S.filter.period = f.value;
+    const r = $('#rPeriod');
+    const cur = r.value;
+    r.innerHTML = `<option value="">Pakai rentang tanggal</option>${opts}`;
+    r.value = [...r.options].some((o) => o.value === cur) ? cur : (S.filter.period || '');
+    syncRecapInputs();
+    renderOrders();
   }
 
   function baseFiltered() {
-    const { date, method, q } = S.filter;
-    const t = today();
+    const { period, method, q } = S.filter;
     const qq = q.trim().toLowerCase();
     return S.orders.filter((o) => {
-      if (date === 'upcoming' && o.sale_date < t) return false;
-      if (date && date !== 'upcoming' && o.sale_date !== date) return false;
+      if (period && o.po_period_id !== period) return false;
       if (method && o.method !== method) return false;
       if (qq) {
         const hay = [o.customer_name, o.phone, o.order_code, o.referral_code, o.address, o.pickup_location].join(' ').toLowerCase();
@@ -189,6 +200,7 @@
       <div class="od-sec">
         <h4>Pengambilan / pengantaran</h4>
         <dl class="od-kv">
+          <dt>Periode</dt><dd>${esc(periodName(o.po_period_id))}</dd>
           <dt>Tanggal</dt><dd>${esc(U.fmtDate(o.sale_date))}</dd>
           <dt>Cara</dt><dd>${o.method === 'pickup' ? 'Ambil sendiri' : 'Diantar'}</dd>
           ${o.method === 'pickup' ? `<dt>Lokasi</dt><dd>${esc(o.pickup_location)}</dd>` : `<dt>Alamat</dt><dd>${esc(o.address)}</dd>`}
@@ -280,7 +292,9 @@
 
   async function loadRecap() {
     try {
-      const list = await API.listOrders({ from: $('#rFrom').value || null, to: $('#rTo').value || null });
+      const per = $('#rPeriod').value;
+      const list = per ? await API.listOrders({ period: per })
+        : await API.listOrders({ from: $('#rFrom').value || null, to: $('#rTo').value || null });
       renderRecap(list);
     } catch (e) { U.toast(U.errMsg(e), 'error'); }
   }
@@ -526,67 +540,207 @@
     catch (err) { U.toast(U.errMsg(err), 'error'); }
   }
 
-  /* ================= JADWAL ================= */
-  async function loadDates() {
-    try { S.saleDates = await API.listSaleDates(addDays(today(), -30)); renderDates(); renderDateFilter(); }
-    catch (e) { U.toast(U.errMsg(e), 'error'); }
+  /* ================= PO & STOK ================= */
+  function rangeTxt(a, b) {
+    const f = (d) => U.fmtDate(d, { day: 'numeric', month: 'short' });
+    return a === b ? f(a) : `${f(a)} – ${f(b)}`;
   }
-
-  function renderDates() {
+  const periodName = (id) => { const p = S.periods.find((x) => x.id === id); return p ? p.name : '-'; };
+  function periodStatus(p) {
     const t = today();
-    const cnt = {};
-    S.orders.forEach((o) => { if (o.status !== 'dibatalkan') cnt[o.sale_date] = (cnt[o.sale_date] || 0) + 1; });
-    const row = (d) => `
-      <div class="da-row ${d.sale_date < t ? 'past' : ''}" data-id="${d.id}">
-        <div class="da-date"><strong>${esc(U.fmtDate(d.sale_date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</strong>
-          <small>${cnt[d.sale_date] || 0} pesanan${d.max_orders ? ` dari kuota ${d.max_orders}` : ''}</small></div>
-        <label class="switch-row"><input type="checkbox" class="switch" data-k="is_open" ${d.is_open ? 'checked' : ''} /><span>${d.is_open ? 'Dibuka' : 'Ditutup'}</span></label>
-        <input class="da-note" type="text" data-k="note" value="${esc(d.note || '')}" placeholder="Catatan untuk pembeli" maxlength="80" aria-label="Catatan" />
-        <input class="da-max" type="number" data-k="max_orders" value="${d.max_orders || ''}" min="1" placeholder="Kuota" aria-label="Kuota pesanan" />
-        <button type="button" class="btn-ghost small danger" data-del="${d.id}">Hapus</button>
-      </div>`;
-    const up = S.saleDates.filter((d) => d.sale_date >= t);
-    const past = S.saleDates.filter((d) => d.sale_date < t).reverse();
-    $('#dateAdmin').innerHTML =
-      (up.length ? up.map(row).join('') : '<div class="empty-admin"><strong>Belum ada jadwal mendatang</strong>Pembeli tidak bisa checkout sampai ada tanggal yang dibuka.</div>') +
-      (past.length ? `<p class="da-group">Sudah lewat (30 hari terakhir)</p>${past.map(row).join('')}` : '');
+    if (!p.is_open) return ['Ditutup manual', 'closed'];
+    if (t < p.order_start) return ['Belum dibuka', 'soon'];
+    if (t > p.order_end) return t > p.delivery_end ? ['Selesai', 'done'] : ['PO ditutup, masa ambil/antar', 'done'];
+    return ['Sedang berjalan', 'live'];
   }
 
-  async function addDate(e) {
-    e.preventDefault();
-    const sale_date = $('#dDate').value;
-    if (!sale_date) return;
+  async function loadPeriods() {
     try {
-      await API.saveSaleDate({ sale_date, is_open: true, note: $('#dNote').value.trim(), max_orders: $('#dMax').value });
-      $('#addDateForm').reset();
-      U.toast('Tanggal ditambahkan', 'success');
-      loadDates();
-    } catch (err) {
-      U.toast(/duplicate|unique/i.test(U.errMsg(err)) ? 'Tanggal itu sudah ada di jadwal.' : U.errMsg(err), 'error');
+      S.periods = await API.listPeriods();
+      renderPeriodFilters();
+      renderPeriods();
+      if (S.stockPeriod && S.periods.some((p) => p.id === S.stockPeriod)) openStock(S.stockPeriod);
+      else $('#stockPanel').hidden = true;
+    } catch (e) { U.toast(U.errMsg(e), 'error'); }
+  }
+
+  function renderPeriods() {
+    const stats = {};
+    S.orders.forEach((o) => {
+      if (!o.po_period_id || o.status === 'dibatalkan') return;
+      const st = (stats[o.po_period_id] ||= { n: 0, total: 0 });
+      st.n++; st.total += o.total;
+    });
+    $('#periodList').innerHTML = S.periods.length ? S.periods.map((p) => {
+      const [label, cls] = periodStatus(p);
+      const st = stats[p.id] || { n: 0, total: 0 };
+      return `<article class="po-card ${S.stockPeriod === p.id ? 'selected' : ''}" data-id="${p.id}">
+          <div class="po-main">
+            <div class="po-title"><h3>${esc(p.name)}</h3><span class="po-badge ${cls}">${esc(label)}</span></div>
+            <dl class="po-dates">
+              <div><dt>PO dibuka</dt><dd>${esc(rangeTxt(p.order_start, p.order_end))}</dd></div>
+              <div><dt>Ambil / antar</dt><dd>${esc(rangeTxt(p.delivery_start, p.delivery_end))}</dd></div>
+              <div><dt>Pesanan aktif</dt><dd>${st.n} (${rupiah(st.total)})</dd></div>
+            </dl>
+            ${p.note ? `<p class="hint">${esc(p.note)}</p>` : ''}
+          </div>
+          <div class="po-actions">
+            <label class="switch-row"><input type="checkbox" class="switch" data-open="${p.id}" ${p.is_open ? 'checked' : ''} /><span>${p.is_open ? 'Dibuka' : 'Ditutup'}</span></label>
+            <button type="button" class="btn-chip strong" data-stock="${p.id}">Atur stok</button>
+            <button type="button" class="btn-chip" data-editp="${p.id}">Edit</button>
+            <button type="button" class="btn-ghost small danger" data-delp="${p.id}">Hapus</button>
+          </div>
+        </article>`;
+    }).join('') : '<div class="empty-admin"><strong>Belum ada periode PO</strong>Buat periode pertama di atas. Pembeli baru bisa memesan saat ada periode yang sedang berjalan.</div>';
+  }
+
+  function fillPeriodForm(p) {
+    const t = today();
+    $('#pId').value = p ? p.id : '';
+    $('#pName').value = p ? p.name : '';
+    $('#pOrderStart').value = p ? p.order_start : t;
+    $('#pOrderEnd').value = p ? p.order_end : addDays(t, 2);
+    $('#pDelStart').value = p ? p.delivery_start : addDays(t, 3);
+    $('#pDelEnd').value = p ? p.delivery_end : addDays(t, 3);
+    $('#pNote').value = p ? p.note || '' : '';
+    $('#pCopyRow').hidden = !!p || !S.periods.length;
+    $('#pSave').textContent = p ? 'Simpan perubahan' : 'Buat periode';
+    $('#pCancel').hidden = !p;
+    $('#pFormTitle').textContent = p ? `Edit ${p.name}` : 'Periode PO baru';
+  }
+
+  async function savePeriodForm(e) {
+    e.preventDefault();
+    const id = $('#pId').value;
+    const old = S.periods.find((x) => x.id === id);
+    const data = {
+      id: id || undefined, name: $('#pName').value, order_start: $('#pOrderStart').value, order_end: $('#pOrderEnd').value,
+      delivery_start: $('#pDelStart').value, delivery_end: $('#pDelEnd').value, note: $('#pNote').value,
+      is_open: old ? old.is_open : true,
+    };
+    if (!data.name.trim()) return U.toast('Isi nama periode, misalnya "PO Minggu 3"', 'error');
+    const btn = $('#pSave');
+    btn.disabled = true;
+    try {
+      const saved = await API.savePeriod(data);
+      if (!id && $('#pCopy').checked && S.periods.length) {
+        const prev = S.periods[0];
+        const q = await API.getStock(prev.id);
+        if (Object.keys(q).length) await API.saveStock(saved.id, q);
+      }
+      U.toast(id ? 'Periode diperbarui' : 'Periode PO dibuat', 'success');
+      if (!id) S.stockPeriod = saved.id;
+      fillPeriodForm(null);
+      await loadPeriods();
+    } catch (err) { U.toast(U.errMsg(err), 'error'); }
+    finally { btn.disabled = false; }
+  }
+
+  async function onPeriodClick(e) {
+    const st = e.target.closest('[data-stock]');
+    if (st) { openStock(st.dataset.stock); return; }
+    const ed = e.target.closest('[data-editp]');
+    if (ed) { fillPeriodForm(S.periods.find((x) => x.id === ed.dataset.editp)); $('#periodForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const del = e.target.closest('[data-delp]');
+    if (del) {
+      const p = S.periods.find((x) => x.id === del.dataset.delp);
+      if (!confirm(`Hapus ${p.name}? Kuota stoknya ikut terhapus. Pesanan yang sudah masuk tetap tersimpan.`)) return;
+      try {
+        await API.deletePeriod(p.id);
+        if (S.stockPeriod === p.id) S.stockPeriod = null;
+        U.toast('Periode dihapus');
+        loadPeriods();
+      } catch (err) { U.toast(U.errMsg(err), 'error'); }
     }
   }
 
-  async function onDateChange(e) {
-    const row = e.target.closest('.da-row');
-    if (!row || !e.target.dataset.k) return;
-    const d = S.saleDates.find((x) => x.id === row.dataset.id);
-    const k = e.target.dataset.k;
-    const prev = d[k];
-    d[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  async function onPeriodToggle(e) {
+    const id = e.target.dataset.open;
+    if (!id) return;
+    const p = S.periods.find((x) => x.id === id);
     try {
-      await API.saveSaleDate(d);
-      if (k === 'is_open') row.querySelector('.switch-row span').textContent = d.is_open ? 'Dibuka' : 'Ditutup';
-      U.toast('Jadwal diperbarui');
-    } catch (err) { d[k] = prev; U.toast(U.errMsg(err), 'error'); renderDates(); }
+      await API.savePeriod({ ...p, is_open: e.target.checked });
+      p.is_open = e.target.checked;
+      renderPeriods();
+      U.toast(`${p.name} ${p.is_open ? 'dibuka' : 'ditutup'}`);
+    } catch (err) { e.target.checked = !e.target.checked; U.toast(U.errMsg(err), 'error'); }
   }
 
-  async function onDateDelete(e) {
-    const b = e.target.closest('[data-del]');
-    if (!b) return;
-    const d = S.saleDates.find((x) => x.id === b.dataset.del);
-    if (!confirm(`Hapus tanggal ${U.fmtDate(d.sale_date)} dari jadwal? Pesanan yang sudah masuk tidak terhapus.`)) return;
-    try { await API.deleteSaleDate(d.id); loadDates(); U.toast('Tanggal dihapus'); }
-    catch (err) { U.toast(U.errMsg(err), 'error'); }
+  // terjual per varian (satuan + isi paket) dari daftar pesanan
+  function soldByVariant(orders) {
+    const m = {};
+    orders.filter((o) => o.status !== 'dibatalkan').forEach((o) => (o.order_items || []).forEach((i) => {
+      if (i.components) i.components.forEach((c) => { m[c.variant_id] = (m[c.variant_id] || 0) + i.qty; });
+      else if (i.variant_id) m[i.variant_id] = (m[i.variant_id] || 0) + i.qty;
+    }));
+    return m;
+  }
+
+  async function openStock(periodId) {
+    S.stockPeriod = periodId;
+    renderPeriods();
+    const p = S.periods.find((x) => x.id === periodId);
+    const panel = $('#stockPanel');
+    panel.hidden = false;
+    $('#stockTitle').textContent = `Stok ${p.name}`;
+    $('#stockTable').innerHTML = '<p class="hint">Memuat stok…</p>';
+    try {
+      const [quota, orders] = await Promise.all([API.getStock(periodId), API.listOrders({ period: periodId })]);
+      S.stockQuota = quota;
+      S.stockSold = soldByVariant(orders);
+      renderStock();
+    } catch (err) { $('#stockTable').innerHTML = `<p class="field-err">${esc(U.errMsg(err))}</p>`; }
+  }
+
+  function renderStock() {
+    const prods = S.products.filter((p) => p.category !== 'bundle');
+    if (!prods.length) { $('#stockTable').innerHTML = '<p class="hint">Belum ada menu.</p>'; return; }
+    $('#stockTable').innerHTML = `<table class="tbl stock-tbl">
+      <thead><tr><th>Menu</th><th class="num">Kuota</th><th class="num">Terjual</th><th class="num">Sisa</th></tr></thead>
+      <tbody>${prods.map((p) => `
+        <tr class="sub"><td colspan="4">${esc(p.name)}${p.is_active ? '' : ' <small>(disembunyikan)</small>'}</td></tr>
+        ${p.variants.map((v) => {
+          const q = S.stockQuota[v.id];
+          const sold = S.stockSold[v.id] || 0;
+          const has = q !== undefined && q !== null;
+          const rem = has ? Math.max(0, q - sold) : null;
+          return `<tr>
+            <td>${esc(v.name)} <small>${esc(v.size_label)}</small></td>
+            <td class="num"><input type="number" min="0" class="quota-input" data-qv="${v.id}" value="${has ? q : ''}" placeholder="∞" aria-label="Kuota ${esc(p.name)} ${esc(v.name)}" /></td>
+            <td class="num">${sold}</td>
+            <td class="num"><span class="rem ${!has ? '' : rem === 0 ? 'out' : rem <= 5 ? 'low' : 'ok'}">${has ? rem : 'Tak terbatas'}</span></td>
+          </tr>`;
+        }).join('')}`).join('')}
+      </tbody></table>`;
+  }
+
+  async function saveStock() {
+    const quotas = {};
+    $$('#stockTable [data-qv]').forEach((inp) => { quotas[inp.dataset.qv] = inp.value === '' ? null : Math.max(0, Number(inp.value) || 0); });
+    const under = Object.entries(quotas).filter(([v, q]) => q !== null && q < (S.stockSold[v] || 0));
+    if (under.length && !confirm('Ada kuota yang lebih kecil dari jumlah yang sudah terjual. Pesanan lama tetap tersimpan, tapi varian itu langsung habis. Lanjut simpan?')) return;
+    const btn = $('#btnSaveStock');
+    btn.disabled = true;
+    try {
+      await API.saveStock(S.stockPeriod, quotas);
+      S.stockQuota = Object.fromEntries(Object.entries(quotas).filter(([, q]) => q !== null));
+      renderStock();
+      U.toast('Stok disimpan', 'success');
+    } catch (err) { U.toast(U.errMsg(err), 'error'); }
+    finally { btn.disabled = false; }
+  }
+
+  function fillAllStock() {
+    const n = $('#stockFillAll').value;
+    if (n === '') return U.toast('Isi angka dulu, misalnya 25', 'error');
+    $$('#stockTable [data-qv]').forEach((inp) => { inp.value = Math.max(0, Number(n) || 0); });
+    U.toast('Semua kuota terisi. Klik "Simpan stok" untuk menyimpan.');
+  }
+
+  function syncRecapInputs() {
+    const byPeriod = !!$('#rPeriod').value;
+    $('#rFrom').disabled = byPeriod;
+    $('#rTo').disabled = byPeriod;
   }
 
   /* ================= PENGATURAN ================= */
@@ -679,7 +833,7 @@
     $('#btnLogoutM').addEventListener('click', logout);
     $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) switchTab(b.dataset.tab); });
 
-    $('#fDate').addEventListener('change', (e) => { S.filter.date = e.target.value; renderOrders(); });
+    $('#fPeriod').addEventListener('change', (e) => { S.filter.period = e.target.value; renderOrders(); });
     $('#fMethod').addEventListener('change', (e) => { S.filter.method = e.target.value; renderOrders(); });
     $('#fSearch').addEventListener('input', (e) => { clearTimeout(searchT); searchT = setTimeout(() => { S.filter.q = e.target.value; renderOrders(); }, 150); });
     $('#statusChips').addEventListener('click', (e) => { const b = e.target.closest('[data-status]'); if (b) { S.filter.status = b.dataset.status; renderOrders(); } });
@@ -689,6 +843,7 @@
     $('#odSave').addEventListener('click', saveOrder);
     $('#odDelete').addEventListener('click', deleteOrder);
 
+    $('#rPeriod').addEventListener('change', () => { syncRecapInputs(); loadRecap(); });
     $('#rFrom').addEventListener('change', loadRecap);
     $('#rTo').addEventListener('change', loadRecap);
 
@@ -713,10 +868,14 @@
     $('#peAddSlot').addEventListener('click', () => { readSlotEditor(); S.editing.bundle_slots.push({ category: 'cheesecuit', variant_name: '', qty: 1 }); renderSlotEditor(); });
     $('#peSlots').addEventListener('click', (e) => { const b = e.target.closest('[data-rmslot]'); if (b) { readSlotEditor(); S.editing.bundle_slots.splice(Number(b.dataset.rmslot), 1); renderSlotEditor(); } });
 
-    $('#addDateForm').addEventListener('submit', addDate);
-    $('#dDate').min = today();
-    $('#dateAdmin').addEventListener('change', onDateChange);
-    $('#dateAdmin').addEventListener('click', onDateDelete);
+    $('#periodForm').addEventListener('submit', savePeriodForm);
+    $('#pCancel').addEventListener('click', () => fillPeriodForm(null));
+    $('#periodList').addEventListener('click', onPeriodClick);
+    $('#periodList').addEventListener('change', onPeriodToggle);
+    $('#btnSaveStock').addEventListener('click', saveStock);
+    $('#btnFillAll').addEventListener('click', fillAllStock);
+    $('#btnCloseStock').addEventListener('click', () => { S.stockPeriod = null; $('#stockPanel').hidden = true; renderPeriods(); });
+    fillPeriodForm(null);
 
     $('#settingsForm').addEventListener('submit', saveSettings);
     $('#sQrisFile').addEventListener('change', onQris);
