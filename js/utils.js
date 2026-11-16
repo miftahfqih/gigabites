@@ -53,22 +53,41 @@
     },
 
     // kompres foto sebelum upload (HP sering menghasilkan file 5–10 MB)
-    compressImage(file, maxSide = 1600, quality = 0.82) {
+    // opts.keepAlpha: pertahankan latar transparan (PNG/WebP/SVG) → hasil WebP/PNG, bukan JPG
+    compressImage(file, maxSide = 1600, quality = 0.82, opts = {}) {
       return new Promise((resolve, reject) => {
-        if (!file || !file.type.startsWith('image/')) return reject(new Error('File harus berupa gambar (JPG/PNG).'));
+        if (!file || !file.type.startsWith('image/')) return reject(new Error('File harus berupa gambar (JPG/PNG/WebP/SVG).'));
+        const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name || '');
+        const keepAlpha = !!opts.keepAlpha && file.type !== 'image/jpeg';
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = () => {
-          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          // SVG tanpa ukuran tetap kadang terbaca 0 atau sangat kecil: render besar agar tajam
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (isSvg || !w || !h) {
+            const ratio = w && h ? w / h : 1;
+            w = ratio >= 1 ? maxSide : Math.round(maxSide * ratio);
+            h = ratio >= 1 ? Math.round(maxSide / ratio) : maxSide;
+          }
+          const scale = Math.min(1, maxSide / Math.max(w, h));
           const c = document.createElement('canvas');
-          c.width = Math.round(img.width * scale);
-          c.height = Math.round(img.height * scale);
+          c.width = Math.max(1, Math.round(w * scale));
+          c.height = Math.max(1, Math.round(h * scale));
           const ctx = c.getContext('2d');
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(0, 0, c.width, c.height);
+          if (!keepAlpha) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, c.width, c.height);
+          }
           ctx.drawImage(img, 0, 0, c.width, c.height);
           URL.revokeObjectURL(url);
-          c.toBlob((b) => (b ? resolve(b) : reject(new Error('Gagal memproses gambar.'))), 'image/jpeg', quality);
+          const done = (b) => (b ? resolve(b) : reject(new Error('Gagal memproses gambar.')));
+          if (!keepAlpha) return c.toBlob(done, 'image/jpeg', quality);
+          // WebP transparan; browser lama yang tidak bisa membuat WebP memakai PNG
+          c.toBlob((b) => {
+            if (b && b.type === 'image/webp') return resolve(b);
+            c.toBlob(done, 'image/png');
+          }, 'image/webp', quality);
         };
         img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Gambar tidak bisa dibaca. Coba foto lain.')); };
         img.src = url;
