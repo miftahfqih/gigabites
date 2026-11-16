@@ -124,6 +124,18 @@ a { color: inherit; }
 }
 .dates-empty { font-size: .95rem; color: var(--cocoa-2); }
 .skeleton-chip { width: 110px; height: 34px; border-radius: 99px; background: rgba(255, 255, 255, .5); }
+.dates-list { flex-direction: column; align-items: flex-start; }
+.period-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.date-chip { cursor: default; }
+button.date-chip { cursor: pointer; color: var(--cocoa); }
+button.date-chip.on { background: var(--cocoa); color: var(--cream); }
+.period-card {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-radius: var(--r-md);
+  background: var(--paper); border: 2px solid var(--cocoa); box-shadow: 0 4px 0 rgba(62, 36, 21, .18);
+}
+.period-card strong { font-family: var(--display); font-weight: 600; font-size: 1.15rem; }
+.period-card span { font-size: .95rem; }
+.period-card small { color: var(--cocoa-2); }
 
 /* gelas cheesecuit berlapis — elemen utama hero */
 .hero-art { position: relative; justify-self: center; width: min(340px, 78vw); }
@@ -225,12 +237,17 @@ a { color: inherit; }
 .v-meta { font-size: .88rem; color: var(--cocoa-2); grid-column: 1; }
 .v-meta b { color: var(--cocoa); }
 .v-plus {
-  grid-row: 1 / span 2; grid-column: 2; width: 38px; height: 38px; border-radius: 50%;
+  grid-row: 1 / span 3; grid-column: 2; width: 38px; height: 38px; border-radius: 50%;
   background: var(--cocoa); color: var(--cream); display: grid; place-items: center;
   font: 600 1.4rem/1 var(--display);
 }
 .v-btn:disabled { cursor: not-allowed; opacity: .6; transform: none; }
-.v-btn:disabled .v-plus { background: #9b8a80; font-size: .65rem; font-family: var(--body); font-weight: 700; text-align: center; line-height: 1.05; }
+.v-stock { grid-column: 1; font-size: .78rem; font-weight: 700; color: #146C38; }
+.v-stock.low { color: #A35A00; }
+.v-stock.out { color: var(--danger); }
+.stock-note { margin: -4px 0 0; font-size: .9rem; font-weight: 600; color: var(--cocoa-2); }
+.ci-short { margin-top: 4px; font-size: .84rem; font-weight: 700; color: var(--danger); }
+.v-btn:disabled .v-plus { background: #9b8a80; }
 .band.sold .band-media::after {
   content: 'Sold out'; position: absolute; left: 14px; top: 14px; padding: 6px 14px; border-radius: 99px;
   background: var(--cocoa); color: var(--cream); font-family: var(--display); font-weight: 600;
