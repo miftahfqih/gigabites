@@ -9,7 +9,9 @@
   const state = {
     settings: null,
     products: [],
-    saleDates: [],
+    periods: [],         // periode PO yang sedang dibuka
+    stock: {},           // { periodId: { variantId: sisa } }  (tidak ada = tidak dibatasi)
+    periodId: U.store.get('gb_period', null),
     vmap: {},            // variant_id -> { product, variant }
     cart: U.store.get('gb_cart', []),
     step: 1,
@@ -35,7 +37,7 @@
       const d = await API.getStorefront();
       state.settings = d.settings;
       state.products = d.products;
-      state.saleDates = d.saleDates;
+      applyPeriods(d);
       state.vmap = {};
       d.products.forEach((p) => p.variants.forEach((v) => (state.vmap[v.id] = { product: p, variant: v })));
       // buang item keranjang yang menunya sudah dihapus admin
@@ -66,13 +68,71 @@
     else if (s.announcement) showNotice(s.announcement);
   }
 
+  /* ---------- periode PO & stok ---------- */
+  function applyPeriods(d) {
+    state.periods = d.periods || [];
+    state.stock = d.stock || {};
+    if (!state.periods.some((p) => p.id === state.periodId)) state.periodId = state.periods[0] ? state.periods[0].id : null;
+    U.store.set('gb_period', state.periodId);
+  }
+  const period = () => state.periods.find((p) => p.id === state.periodId) || null;
+  // sisa stok varian di periode terpilih (Infinity = tidak dibatasi)
+  const remaining = (vid) => { const m = state.stock[state.periodId] || {}; return vid in m ? m[vid] : Infinity; };
+  const flagsOk = (p, v) => !p.is_sold_out && !v.is_sold_out;
+  const canOrder = () => !!period() && state.settings && state.settings.store_open;
+  // jumlah per varian yang sudah ada di keranjang (satuan + isi paket)
+  function cartDemand(cart = state.cart) {
+    const d = {};
+    cart.forEach((c) => {
+      const m = state.vmap[c.variant_id];
+      if (!m) return;
+      if (c.picks) c.picks.forEach((id) => { d[id] = (d[id] || 0) + c.qty; });
+      else if (m.product.category !== 'bundle') d[c.variant_id] = (d[c.variant_id] || 0) + c.qty;
+    });
+    return d;
+  }
+  function overStock(cart = state.cart) {
+    const d = cartDemand(cart);
+    return Object.keys(d).filter((vid) => d[vid] > remaining(vid));
+  }
+  function deliveryDates(per) {
+    if (!per) return [];
+    const t = U.todayJakarta();
+    let cur = per.delivery_start > t ? per.delivery_start : t;
+    const out = [];
+    while (cur <= per.delivery_end && out.length < 31) {
+      out.push(cur);
+      const d = U.parseDate(cur); d.setDate(d.getDate() + 1); cur = d.toISOString().slice(0, 10);
+    }
+    return out;
+  }
+  function rangeText(a, b) {
+    return a === b ? U.fmtDateShort(a) : `${U.fmtDateShort(a)} – ${U.fmtDateShort(b)}`;
+  }
+
   function renderDates() {
     const list = $('#datesList');
-    if (!state.saleDates.length) {
-      list.innerHTML = '<span class="dates-empty">Belum ada jadwal. Pantau Instagram kami untuk info pre-order berikutnya.</span>';
+    if (!state.periods.length) {
+      list.innerHTML = '<span class="dates-empty">Belum ada PO yang dibuka. Pantau Instagram kami untuk info PO berikutnya.</span>';
       return;
     }
-    list.innerHTML = state.saleDates.slice(0, 6).map((d) => `<span class="date-chip">${esc(U.fmtDateShort(d.sale_date))}</span>`).join('');
+    const chips = state.periods.length > 1
+      ? `<div class="period-chips" role="group" aria-label="Pilih periode PO">${state.periods.map((p) =>
+          `<button type="button" class="date-chip ${p.id === state.periodId ? 'on' : ''}" data-period="${p.id}" aria-pressed="${p.id === state.periodId}">${esc(p.name)}</button>`).join('')}</div>`
+      : '';
+    const p = period();
+    list.innerHTML = `${chips}<div class="period-card">
+        <strong>${esc(p.name)}</strong>
+        <span>Pesan sampai ${esc(U.fmtDate(p.order_end))}</span>
+        <span>Ambil / antar ${esc(rangeText(p.delivery_start, p.delivery_end))}</span>
+        ${p.note ? `<small>${esc(p.note)}</small>` : ''}
+      </div>`;
+  }
+
+  function selectPeriod(id) {
+    state.periodId = id;
+    U.store.set('gb_period', id);
+    renderDates(); renderBands(); renderCart();
   }
 
   /* ---------- paket bundle ---------- */
@@ -84,7 +144,7 @@
       state.products.forEach((op) => {
         if (op.category !== slot.category) return;
         const v = op.variants.find((x) => x.name.toLowerCase() === String(slot.variant_name).toLowerCase());
-        if (v) options.push({ product: op, variant: v, available: !op.is_sold_out && !v.is_sold_out });
+        if (v) options.push({ product: op, variant: v, available: flagsOk(op, v) && remaining(v.id) > 0 });
       });
       const n = Math.max(1, Number(slot.qty) || 1);
       const size = options[0] ? options[0].variant.size_label : '';
@@ -138,8 +198,8 @@
           ${v ? `<div class="bundle-row">
             <div class="bundle-price"><strong>${rupiah(v.price)}</strong>${save ? `<span class="save-chip">Hemat ${rupiah(save)}</span>` : ''}</div>
             <button class="v-btn v-bundle" type="button" data-product="${p.id}" data-variant="${v.id}" ${ok ? '' : 'disabled'}
-              aria-label="${esc(`Pilih isi paket ${p.name}, ${rupiah(v.price)}${ok ? '' : ', sold out'}`)}">
-              <span class="v-name">${ok ? 'Pilih isi paket' : 'Sold out'}</span>
+              aria-label="${esc(`Pilih isi paket ${p.name}, ${rupiah(v.price)}${ok ? '' : ', habis'}`)}">
+              <span class="v-name">${ok ? 'Pilih isi paket' : 'Habis'}</span>
               <span class="v-meta">${esc(slotsText(p))}</span>
               <span class="v-plus" aria-hidden="true">${ok ? '+' : '×'}</span>
             </button></div>` : ''}
@@ -148,15 +208,19 @@
   }
 
   function bandHTML(p) {
-    const allSold = p.is_sold_out || p.variants.every((v) => v.is_sold_out);
+    const isSold = (v) => !flagsOk(p, v) || remaining(v.id) <= 0;
+    const allSold = p.variants.every(isSold);
     const on = U.onColor(p.accent);
     const variants = p.variants.map((v) => {
-      const sold = p.is_sold_out || v.is_sold_out;
+      const sold = isSold(v);
+      const r = remaining(v.id);
+      const stockTxt = sold ? 'Habis' : r !== Infinity ? `Sisa ${r}` : '';
       return `<button class="v-btn" type="button" data-product="${p.id}" data-variant="${v.id}" ${sold ? 'disabled' : ''}
-          aria-label="${esc(`${p.name} ${v.name} ${v.size_label}, ${rupiah(v.price)}${sold ? ', sold out' : ''}`)}">
+          aria-label="${esc(`${p.name} ${v.name} ${v.size_label}, ${rupiah(v.price)}${stockTxt ? ', ' + stockTxt : ''}`)}">
           <span class="v-name">${esc(v.name)}</span>
           <span class="v-meta">${esc(v.size_label)} &nbsp;<b>${rupiah(v.price)}</b></span>
-          <span class="v-plus" aria-hidden="true">${sold ? 'Sold<br>out' : '+'}</span>
+          ${stockTxt ? `<span class="v-stock ${sold ? 'out' : r <= 5 ? 'low' : ''}">${stockTxt}</span>` : ''}
+          <span class="v-plus" aria-hidden="true">${sold ? '×' : '+'}</span>
         </button>`;
     }).join('');
     return `<article class="band ${allSold ? 'sold' : ''}" style="--accent:${esc(p.accent)};--on:${on}">
@@ -212,7 +276,7 @@
   function openProduct(productId, variantId) {
     const p = state.products.find((x) => x.id === productId);
     if (!p) return;
-    const firstAvail = p.variants.find((v) => !v.is_sold_out && !p.is_sold_out);
+    const firstAvail = p.variants.find((v) => flagsOk(p, v) && remaining(v.id) > 0);
     const isBundle = p.category === 'bundle';
     const units = isBundle ? slotUnits(p) : [];
     state.sheet = {
@@ -225,7 +289,7 @@
       <fieldset class="slot-pick"><legend>${esc(u.label)}</legend>
         <div class="date-options">${u.options.map((o) => `<label class="pill"><input type="radio" name="slot${i}" data-slot="${i}" value="${o.variant.id}"
           ${state.sheet.picks[i] === o.variant.id ? 'checked' : ''} ${o.available ? '' : 'disabled'} />
-          <span>${esc(o.product.name)}${o.available ? '' : '<small>sold out</small>'}</span></label>`).join('') || '<span class="hint">Belum ada pilihan</span>'}</div>
+          <span>${esc(o.product.name)}${o.available ? (remaining(o.variant.id) !== Infinity ? `<small>sisa ${remaining(o.variant.id)}</small>` : '') : '<small>habis</small>'}</span></label>`).join('') || '<span class="hint">Belum ada pilihan</span>'}</div>
       </fieldset>`).join('');
     const sheet = $('#productSheet');
     sheet.style.setProperty('--accent', p.accent);
@@ -238,29 +302,58 @@
     if (p.category === 'bundle' && bundleSaving(p)) { $('#psSave').hidden = false; $('#psSave').textContent = `Hemat ${rupiah(bundleSaving(p))} dibanding beli satuan`; }
     $('#psNote').value = '';
     $('#psVariants').innerHTML = p.variants.map((v) => {
-      const sold = p.is_sold_out || v.is_sold_out;
+      const r = remaining(v.id);
+      const sold = !flagsOk(p, v) || r <= 0;
+      const info = sold ? ' — habis' : r !== Infinity ? ` — sisa ${r}` : '';
       return `<label class="v-opt"><input type="radio" name="psVariant" value="${v.id}" ${v.id === state.sheet.variantId ? 'checked' : ''} ${sold ? 'disabled' : ''} />
-        <span><strong>${esc(v.name)}</strong><small>${esc(v.size_label)}${sold ? ' · sold out' : ''}</small><b>${rupiah(v.price)}</b></span></label>`;
+        <span><strong>${esc(v.name)}</strong><small>${esc(v.size_label)}${info}</small><b>${rupiah(v.price)}</b></span></label>`;
     }).join('');
     updateSheet();
     openLayer(sheet);
   }
 
+  // jumlah maksimal yang masih bisa ditambahkan dari sheet (memperhitungkan isi keranjang)
+  function sheetMax() {
+    const sh = state.sheet;
+    const inCart = cartDemand();
+    const need = {};
+    if (sh.isBundle) sh.picks.forEach((id) => { if (id) need[id] = (need[id] || 0) + 1; });
+    else if (sh.variantId) need[sh.variantId] = 1;
+    let mx = 50;
+    Object.entries(need).forEach(([id, n]) => {
+      const r = remaining(id);
+      if (r !== Infinity) mx = Math.min(mx, Math.floor((r - (inCart[id] || 0)) / n));
+    });
+    return Math.max(0, mx);
+  }
+
   function updateSheet() {
-    const { product, variantId, qty } = state.sheet;
+    const sh = state.sheet;
+    const { product, variantId } = sh;
     const v = product.variants.find((x) => x.id === variantId);
-    $('#psQtyVal').textContent = qty;
+    const max = sheetMax();
+    if (sh.qty > Math.max(1, max)) sh.qty = Math.max(1, max);
+    $('#psQtyVal').textContent = sh.qty;
+    const hint = $('#psStock');
+    const inCart = cartDemand();
+    hint.hidden = true;
+    if (!sh.isBundle && v && remaining(v.id) !== Infinity) {
+      hint.hidden = false;
+      hint.textContent = `Sisa ${remaining(v.id)} untuk ${period() ? period().name : 'periode ini'}${inCart[v.id] ? ` (${inCart[v.id]} sudah di keranjang)` : ''}`;
+    }
     const btn = $('#psAdd');
     if (!state.settings.store_open) { btn.disabled = true; btn.textContent = 'Toko sedang tutup'; return; }
-    if (!v) { btn.disabled = true; btn.textContent = 'Sold out'; return; }
-    if (state.sheet.isBundle && state.sheet.picks.some((x) => !x)) { btn.disabled = true; btn.textContent = 'Pilih rasa untuk semua isi paket'; return; }
+    if (!period()) { btn.disabled = true; btn.textContent = 'Belum ada PO yang dibuka'; return; }
+    if (!v) { btn.disabled = true; btn.textContent = 'Habis'; return; }
+    if (sh.isBundle && sh.picks.some((x) => !x)) { btn.disabled = true; btn.textContent = 'Pilih rasa untuk semua isi paket'; return; }
+    if (max <= 0) { btn.disabled = true; btn.textContent = 'Stok tidak cukup'; return; }
     btn.disabled = false;
-    btn.textContent = `Tambah ke keranjang  ·  ${rupiah(v.price * qty)}`;
+    btn.textContent = `Tambah ke keranjang  ·  ${rupiah(v.price * sh.qty)}`;
   }
 
   function addToCart() {
     const { product, variantId, qty, isBundle } = state.sheet;
-    if (!variantId) return;
+    if (!variantId || sheetMax() < qty) return;
     const note = $('#psNote').value.trim().slice(0, 200);
     const picks = isBundle ? state.sheet.picks.slice() : null;
     const same = (c) => c.variant_id === variantId && (c.note || '') === note && JSON.stringify(c.picks || null) === JSON.stringify(picks);
@@ -278,11 +371,15 @@
   function saveCart() { U.store.set('gb_cart', state.cart); }
 
   function cartLines() {
+    const over = overStock();
     return state.cart.map((c, i) => {
       const m = state.vmap[c.variant_id];
-      let sold = m.product.is_sold_out || m.variant.is_sold_out;
-      if (c.picks) sold = sold || c.picks.some((id) => { const x = state.vmap[id]; return !x || x.product.is_sold_out || x.variant.is_sold_out; });
-      return { ...c, i, product: m.product, variant: m.variant, sold, total: m.variant.price * c.qty };
+      let sold = !flagsOk(m.product, m.variant);
+      if (c.picks) sold = sold || c.picks.some((id) => { const x = state.vmap[id]; return !x || !flagsOk(x.product, x.variant); });
+      const ids = c.picks || [c.variant_id];
+      const shortIds = ids.filter((id) => over.includes(id));
+      const short = shortIds.length ? [...new Set(shortIds)].map((id) => `${pickName(id)} sisa ${remaining(id)}`).join(', ') : '';
+      return { ...c, i, product: m.product, variant: m.variant, sold, short, total: m.variant.price * c.qty };
     });
   }
   const cartSubtotal = () => cartLines().filter((l) => !l.sold).reduce((a, l) => a + l.total, 0);
@@ -312,7 +409,8 @@
         <img src="${esc(l.product.image_url || 'assets/mascot.svg')}" alt="" />
         <div>
           <div class="ci-top">
-            <div><div class="ci-name">${esc(l.product.name)}</div><div class="ci-var">${l.picks ? esc(picksText(l.picks)) : `${esc(l.variant.name)} ${esc(l.variant.size_label)}`}${l.sold ? ' — <b style="color:var(--danger)">sold out, hapus dulu</b>' : ''}</div></div>
+            <div><div class="ci-name">${esc(l.product.name)}</div><div class="ci-var">${l.picks ? esc(picksText(l.picks)) : `${esc(l.variant.name)} ${esc(l.variant.size_label)}`}${l.sold ? ' — <b style="color:var(--danger)">sold out, hapus dulu</b>' : ''}</div>
+              ${l.short ? `<div class="ci-short">Stok tidak cukup: ${esc(l.short)}. Kurangi jumlahnya.</div>` : ''}</div>
             <div class="ci-price">${rupiah(l.total)}</div>
           </div>
           <div class="ci-bottom">
@@ -328,9 +426,14 @@
       </div>`).join('');
     $('#cartSubtotal').textContent = rupiah(cartSubtotal());
     const anySold = lines.some((l) => l.sold);
+    const anyShort = lines.some((l) => l.short);
     const btn = $('#btnCheckout');
-    btn.disabled = anySold || !state.settings || !state.settings.store_open;
-    btn.textContent = anySold ? 'Hapus item sold out dulu' : (state.settings && !state.settings.store_open ? 'Toko sedang tutup' : 'Lanjut isi data');
+    btn.disabled = anySold || anyShort || !canOrder();
+    btn.textContent = anySold ? 'Hapus item sold out dulu'
+      : anyShort ? 'Kurangi item yang stoknya tidak cukup'
+      : !state.settings || !state.settings.store_open ? 'Toko sedang tutup'
+      : !period() ? 'Belum ada PO yang dibuka'
+      : 'Lanjut isi data';
   }
 
   function onCartClick(e) {
@@ -338,7 +441,12 @@
     if (!btn || btn.dataset.act === 'note') return;
     const i = Number(btn.closest('.cart-item').dataset.i);
     const c = state.cart[i];
-    if (btn.dataset.act === 'inc') c.qty = Math.min(50, c.qty + 1);
+    if (btn.dataset.act === 'inc') {
+      const trial = state.cart.map((x, j) => (j === i ? { ...x, qty: x.qty + 1 } : x));
+      const over = overStock(trial).filter((id) => (c.picks || [c.variant_id]).includes(id));
+      if (over.length) { U.toast(`Stok ${pickName(over[0])} tinggal ${remaining(over[0])}`, 'info', 2200); return; }
+      c.qty = Math.min(50, c.qty + 1);
+    }
     if (btn.dataset.act === 'dec') c.qty -= 1;
     if (btn.dataset.act === 'rm' || c.qty < 1) state.cart.splice(i, 1);
     saveCart();
@@ -359,10 +467,13 @@
   function renderCheckoutOptions() {
     const s = state.settings;
     const sel = ($('input[name=sale_date]:checked') || {}).value;
-    $('#dateOptions').innerHTML = state.saleDates.length
-      ? state.saleDates.map((d, i) => `<label class="pill"><input type="radio" name="sale_date" value="${d.sale_date}" ${(sel ? sel === d.sale_date : i === 0) ? 'checked' : ''} />
-          <span>${esc(U.fmtDate(d.sale_date))}${d.note ? `<small>${esc(d.note)}</small>` : ''}</span></label>`).join('')
-      : '<p class="hint">Belum ada tanggal pre-order yang dibuka. Coba cek lagi nanti ya.</p>';
+    const per = period();
+    const dates = deliveryDates(per);
+    $('#periodHint').textContent = per ? `${per.name}: ambil / antar ${rangeText(per.delivery_start, per.delivery_end)}` : '';
+    $('#dateOptions').innerHTML = dates.length
+      ? dates.map((d, i) => `<label class="pill"><input type="radio" name="sale_date" value="${d}" ${(dates.includes(sel) ? sel === d : i === 0) ? 'checked' : ''} />
+          <span>${esc(U.fmtDate(d))}</span></label>`).join('')
+      : '<p class="hint">Belum ada PO yang dibuka. Coba cek lagi nanti ya.</p>';
     const selLoc = ($('input[name=pickup_location]:checked') || {}).value;
     $('#locOptions').innerHTML = (s.pickup_locations || []).map((l, i) => `<label class="loc"><input type="radio" name="pickup_location" value="${esc(l.name)}" ${(selLoc ? selLoc === l.name : i === 0) ? 'checked' : ''} />
         <span><strong>${esc(l.name)}</strong><small>${esc(l.detail || '')}</small></span></label>`).join('');
@@ -403,7 +514,7 @@
     const next = $('#coNext');
     next.disabled = false;
     next.textContent = n === 3 ? 'Kirim pesanan' : 'Lanjut';
-    if (n === 2 && !state.saleDates.length) next.disabled = true;
+    if (n === 2 && !deliveryDates(period()).length) next.disabled = true;
     updateFooterTotal();
     $('#coForm').scrollTop = 0;
   }
@@ -468,7 +579,7 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Mengecek stok';
       try {
-        state.quote = await API.quote(apiItems(), method());
+        state.quote = await API.quote(apiItems(), method(), state.periodId);
         renderSummary();
         goStep(3);
       } catch (e) {
@@ -496,6 +607,7 @@
       const proofPath = await API.uploadProof(state.proofBlob);
       btn.innerHTML = '<span class="spinner"></span> Mengirim pesanan';
       const payload = {
+        period_id: state.periodId,
         name: $('#fName').value.trim(),
         phone: $('#fPhone').value.trim(),
         method: method(),
@@ -546,7 +658,8 @@
   async function refreshMenuSilently() {
     try {
       const d = await API.getStorefront();
-      state.settings = d.settings; state.products = d.products; state.saleDates = d.saleDates;
+      state.settings = d.settings; state.products = d.products;
+      applyPeriods(d);
       state.vmap = {};
       d.products.forEach((p) => p.variants.forEach((v) => (state.vmap[v.id] = { product: p, variant: v })));
       state.cart = state.cart.filter((c) => state.vmap[c.variant_id] && (!c.picks || c.picks.every((id) => state.vmap[id])));
@@ -599,7 +712,7 @@
         : flow.map((s, i) => `<li class="${i < idx ? 'done' : i === idx ? 'now' : ''}">${esc(U.STATUS[s].label)}</li>`).join('');
       out.innerHTML = `<div class="track-card">
           <h5>${esc(o.order_code)}</h5>
-          <p class="hint">${esc(o.customer_name)} — ${esc(U.fmtDate(o.sale_date))}, ${o.method === 'pickup' ? 'ambil di ' + esc(o.pickup_location) : 'diantar'} — ${rupiah(o.total)}</p>
+          <p class="hint">${o.period_name ? esc(o.period_name) + ' — ' : ''}${esc(o.customer_name)} — ${esc(U.fmtDate(o.sale_date))}, ${o.method === 'pickup' ? 'ambil di ' + esc(o.pickup_location) : 'diantar'} — ${rupiah(o.total)}</p>
           <ul class="timeline">${tl}</ul>
           ${o.admin_note ? `<div class="admin-note"><b>Info dari Gigabites:</b> ${esc(o.admin_note)}</div>` : ''}
         </div>`;
@@ -621,7 +734,8 @@
     $('#overlay').addEventListener('click', closeLayer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLayer(); });
 
-    $('#psVariants').addEventListener('change', (e) => { state.sheet.variantId = e.target.value; updateSheet(); });
+    $('#psVariants').addEventListener('change', (e) => { state.sheet.variantId = e.target.value; state.sheet.qty = 1; updateSheet(); });
+    $('#datesList').addEventListener('click', (e) => { const b = e.target.closest('[data-period]'); if (b) selectPeriod(b.dataset.period); });
     $('#psSlots').addEventListener('change', (e) => {
       if (e.target.dataset.slot == null) return;
       state.sheet.picks[Number(e.target.dataset.slot)] = e.target.value;
@@ -630,7 +744,10 @@
     $('#psQty').addEventListener('click', (e) => {
       const b = e.target.closest('[data-q]');
       if (!b) return;
-      state.sheet.qty = Math.max(1, Math.min(50, state.sheet.qty + Number(b.dataset.q)));
+      const max = Math.max(1, sheetMax());
+      const nextQ = state.sheet.qty + Number(b.dataset.q);
+      if (nextQ > max && Number(b.dataset.q) > 0) U.toast(`Stok hanya cukup untuk ${max}`, 'info', 1800);
+      state.sheet.qty = Math.max(1, Math.min(max, nextQ));
       updateSheet();
     });
     $('#psAdd').addEventListener('click', addToCart);
